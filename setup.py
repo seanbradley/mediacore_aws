@@ -11,6 +11,7 @@ setup(
     description = 'Amazon Web Services integration for MediaCore.',
     install_requires = [
         'MediaCore >= 0.9.0b3',
+        'boto >= 2.0b3',
     ],
     entry_points = {
         'mediacore.plugin': ['aws = mediacore_aws'],

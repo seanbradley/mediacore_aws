@@ -101,11 +101,11 @@ class AmazonS3Storage(FileStorageEngine):
             'file_post_var_name': 'file',
         }
 
-    def delete(self, unique_id):
+    def delete(self, media_file):
         """Delete the stored file represented by the given unique ID.
 
-        :type unique_id: unicode
-        :param unique_id: The identifying string for this file.
+        :type media_file: :class:`~mediacore.model.media.MediaFile`
+        :param media_file: The associated media file object.
         :rtype: boolean
         :returns: True if successful, False if an error occurred.
 
@@ -113,6 +113,7 @@ class AmazonS3Storage(FileStorageEngine):
         access_key = self._data['aws_access_key'].encode('utf-8')
         secret_key = self._data['aws_secret_key'].encode('utf-8')
         bucket_name = self._data['s3_bucket_name'].encode('utf-8')
+        file_path = self._get_path(media_file.unique_id)
 
         try:
             conn = S3Connection(access_key, secret_key)
@@ -127,9 +128,9 @@ class AmazonS3Storage(FileStorageEngine):
 
         # TODO: Find out if there is a way that avoids an extra API call
         # as Boto doesn't appear to return a value from a delete_key()
-        if bucket.get_key(unique_id):
-            bucket.delete_key(unique_id)
-            if bucket.get_key(unique_id):
+        if bucket.get_key(file_path):
+            bucket.delete_key(file_path)
+            if bucket.get_key(file_path):
                 raise StorageError("Error - Failed to delete media from S3")
             else:
                 return True

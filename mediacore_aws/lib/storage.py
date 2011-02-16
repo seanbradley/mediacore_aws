@@ -134,8 +134,6 @@ class AmazonS3Storage(FileStorageEngine):
                 raise StorageError("Error - Failed to delete media from S3")
             else:
                 return True
-        else:
-            raise StorageError("Error - Media not found on S3")
 
     def get_uris(self, media_file):
         """Return a list of URIs from which the stored file can be accessed.

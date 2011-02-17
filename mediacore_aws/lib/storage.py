@@ -15,6 +15,7 @@ from pylons import config
 
 from mediacore.lib.compat import sha1
 from mediacore.lib.i18n import N_
+from mediacore.lib.decorators import memoize
 from mediacore.lib.filetypes import guess_container_format, guess_media_type
 from mediacore.lib.storage import safe_file_name, FileStorageEngine, StorageError
 from mediacore.lib.storage.localfiles import LocalFileStorage
@@ -96,10 +97,35 @@ class AmazonS3Storage(FileStorageEngine):
         }
 
         return {
-            'upload_url': 'https://%s.s3.amazonaws.com/' % bucket_name,
+            'upload_url': self.bucket_url,
             'extra_post_data': post_data,
             'file_post_var_name': 'file',
         }
+
+    @memoize
+    def connect(self):
+        """Open a boto connection to S3 using our AWS credentials."""
+        access_key = self._data['aws_access_key'].encode('utf-8')
+        secret_key = self._data['aws_secret_key'].encode('utf-8')
+        try:
+            return S3Connection(access_key, secret_key)
+        except S3ResponseError, e:
+            raise StorageError("There was an error connecting to Amazon S3. "
+                               "Please make sure that you have entered "
+                               "the correct credentials in your settings.")
+
+    def connect_to_bucket(self):
+        """Open a boto connection to configured S3 bucket."""
+        bucket_name = self._data['s3_bucket_name'].encode('utf-8')
+        conn = self.connect()
+        try:
+            return conn.get_bucket(bucket_name)
+        except S3ResponseError, e:
+            raise StorageError("Error - Unable to connect to S3 bucket")
+
+    @property
+    def bucket_url(self):
+        return 'https://%s.s3.amazonaws.com/' % self._data['s3_bucket_name']
 
     def delete(self, media_file):
         """Delete the stored file represented by the given unique ID.
@@ -110,21 +136,8 @@ class AmazonS3Storage(FileStorageEngine):
         :returns: True if successful, False if an error occurred.
 
         """
-        access_key = self._data['aws_access_key'].encode('utf-8')
-        secret_key = self._data['aws_secret_key'].encode('utf-8')
-        bucket_name = self._data['s3_bucket_name'].encode('utf-8')
         file_path = self._get_path(media_file.unique_id)
-
-        try:
-            conn = S3Connection(access_key, secret_key)
-        except S3ResponseError, e:
-            raise StorageError("There was an error connecting to Amazon S3."
-                               "Please make sure that you have entered"
-                               "the correct credentials in your settings.")
-        try:
-            bucket = conn.get_bucket(bucket_name)
-        except S3ResponseError, e:
-            raise StorageError("Error - Unable to connect to S3 bucket")
+        bucket = self.connect_to_bucket()
 
         # TODO: Find out if there is a way that avoids an extra API call
         # as Boto doesn't appear to return a value from a delete_key()
